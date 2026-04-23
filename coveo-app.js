@@ -71,7 +71,7 @@ function buildDOM(host) {
     <div class="coveo-rga-wrapper" style="margin:2rem auto;font-family:sans-serif;">
 
       <!-- Hidden search form (parity with App.jsx) -->
-      <form id="coveo-rga-form" style="">
+      <form id="coveo-rga-form" style="display: none;">
         <input  id="coveo-rga-input"  type="text" />
         <button id="coveo-rga-submit" type="submit">Search</button>
       </form>
