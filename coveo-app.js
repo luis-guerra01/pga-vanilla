@@ -36,6 +36,16 @@ const ICON_COPY = `
       stroke="currentColor" stroke-linecap="round"/>
   </svg>`;
 
+const ICON_COLLAPSE_CAROT = `
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4.5 6.50024L8 10.0002L11.5 6.50024" stroke="currentColor" stroke-linecap="round"/>
+  </svg>`;
+
+const ICON_EXPAND_CAROT = `
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4.5 9.50024L8 5.00024L11.5 9.50024" stroke="currentColor" stroke-linecap="round"/>
+  </svg>`;
+
 // ─── URL helpers ──────────────────────────────────────────────────────────────
 
 function getQueryFromUrl() {
@@ -61,7 +71,7 @@ function buildDOM(host) {
     <div class="coveo-rga-wrapper" style="margin:2rem auto;font-family:sans-serif;">
 
       <!-- Hidden search form (parity with App.jsx) -->
-      <form id="coveo-rga-form" style="display:none;">
+      <form id="coveo-rga-form" style="">
         <input  id="coveo-rga-input"  type="text" />
         <button id="coveo-rga-submit" type="submit">Search</button>
       </form>
@@ -69,12 +79,14 @@ function buildDOM(host) {
       <!-- Loading indicator -->
       <div id="coveo-rga-loading">loading engine …</div>
 
+      <!-- Generating indicator -->
+      <div id="coveo-rga-generating" style="display:none; margin: 1rem 0; color: #666;">Generating answer...</div>
+
       <!-- RGA card — hidden until there is an answer -->
       <div id="coveo-rga-card" class="coveo-rga-card" style="display:none;">
 
         <div class="rga-header">
           <span class="rga-icon">✨ Generated answer</span>
-          <div class="rga-toggle"></div>
         </div>
 
         <!-- Answer content (markdown rendered as HTML) -->
@@ -99,11 +111,16 @@ function buildDOM(host) {
         </div>
 
       </div>
+      <div style="text-align:left; margin-top:0.5rem;">
+        <button id="btn-collapse" style="display:none;" class="expand-collapse-button" title="Expand/Collapse">Show Less ${ICON_EXPAND_CAROT}</button>
+        <button id="btn-expand" style="display:none;" class="expand-collapse-button" title="Expand/Collapse">Show More ${ICON_COLLAPSE_CAROT}</button>
+      </div>
     </div>
   `;
 
   return {
     loading:       host.querySelector('#coveo-rga-loading'),
+    generating:    host.querySelector('#coveo-rga-generating'),
     card:          host.querySelector('#coveo-rga-card'),
     content:       host.querySelector('#coveo-rga-content'),
     citationsWrap: host.querySelector('#coveo-rga-citations'),
@@ -113,38 +130,56 @@ function buildDOM(host) {
     btnCopy:       host.querySelector('#coveo-btn-copy'),
     form:          host.querySelector('#coveo-rga-form'),
     input:         host.querySelector('#coveo-rga-input'),
+    btnCollapse: host.querySelector('#btn-collapse'),
+    btnExpand: host.querySelector('#btn-expand'),
   };
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
-/**
- * Re-renders the RGA card whenever RGAController state changes.
- * Mirrors: {rgaState?.answer && (<div className="coveo-rga-card">…</div>)}
- */
 function renderRGA(rgaState, els) {
-  if (!rgaState?.answer) {
+  if (rgaState?.isLoading && !rgaState?.answer) {
     els.card.style.display = 'none';
-    return;
-  }
-
-  // Show card and render markdown → HTML
-  // Mirrors: <div dangerouslySetInnerHTML={{ __html: parseMarkdownToHTML(rgaState.answer) }} />
-  els.card.style.display = 'block';
-  els.content.innerHTML  = parseMarkdownToHTML(rgaState.answer);
-
-  // Citations — mirrors: {rgaState.citations?.length > 0 && (…)}
-  if (rgaState.citations?.length > 0) {
-    els.citationsGrid.innerHTML = rgaState.citations
-      .map((c) => `
-        <a href="${c.clickUri}" target="_blank" class="citation-pill">
-          ${c.title}
-        </a>
-      `)
-      .join('');
-    els.citationsWrap.style.display = 'block';
+  } else if(!rgaState?.isStreaming && rgaState?.isAnswerGenerated) {
+    // Show generating message
+    els.generating.style.display = 'none';
+    //show expand collapose buttons
+    //check if card height is more than 300px to decide whether to show expand button or not
+    if(els.card.scrollHeight > 300) {
+      els.btnExpand.style.display = 'inline-block';
+      els.btnCollapse.style.display = 'none';
+    } else {
+      els.btnExpand.style.display = 'none';
+      els.btnCollapse.style.display = 'inline-block';
+    }
+  } else if (rgaState?.answer) {
+    // Hide generating and show card
+    els.generating.style.display = 'inline-block ';
+    els.card.style.display = 'block';
+    els.content.innerHTML  = parseMarkdownToHTML(rgaState.answer);
+    // Citations — mirrors: {rgaState.citations?.length > 0 && (…)}
+    if (rgaState.citations?.length > 0) {
+      els.citationsGrid.innerHTML = rgaState.citations
+        .map((c) => `
+          <a href="${c.clickUri}" target="_blank" class="citation-pill">
+            ${c.title}
+          </a>
+        `)
+        .join('');
+      els.citationsWrap.style.display = 'block';
+    } else {
+      els.citationsWrap.style.display = 'none';
+    }
+    console.log(rgaState);
+  } else if (rgaState.error) {
+    // Hide generating and show error message in card
+    els.generating.style.display = 'none';
+    els.card.style.display = 'block';
+    els.content.innerHTML  = `<p style="color:red;">Error: ${rgaState.error}</p>`;
   } else {
-    els.citationsWrap.style.display = 'none';
+    // Hide both
+    els.generating.style.display = 'none';
+    els.card.style.display = 'none';
   }
 }
 
@@ -203,6 +238,18 @@ function bindActionButtons(els, controllers) {
       els.btnCopy.classList.add('active-copy');
       setTimeout(() => els.btnCopy.classList.remove('active-copy'), 2000);
     });
+  });
+
+  // ── Expand / Collapse ─────────────────────────────────────────────────────
+  els.btnExpand.addEventListener('click', () => {
+    els.card.style.maxHeight = 'none';
+    els.btnExpand.style.display = 'none';
+    els.btnCollapse.style.display = 'inline-block';
+  });
+  els.btnCollapse.addEventListener('click', () => {
+    els.card.style.maxHeight = '300px';
+    els.btnExpand.style.display = 'inline-block';
+    els.btnCollapse.style.display = 'none';
   });
 }
 
