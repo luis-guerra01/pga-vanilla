@@ -290,7 +290,8 @@ function handleSearch({ controllers, query }) {
 
 function bindUrlChangeListener(controllers) {
   let lastQ = getQueryFromUrl();
-
+  const searchAllResultsForm = document.querySelector("#SearchAllResultsWithSuggest form");
+    
   const onUrlChange = () => {
     const newQ = getQueryFromUrl();
     if (newQ !== lastQ) {
@@ -301,10 +302,12 @@ function bindUrlChangeListener(controllers) {
 
   window.addEventListener('popstate',   onUrlChange);
   window.addEventListener('hashchange', onUrlChange);
-
+  searchAllResultsForm.addEventListener('submit', onUrlChange);
+  
   return () => {
     window.removeEventListener('popstate',   onUrlChange);
     window.removeEventListener('hashchange', onUrlChange);
+    searchAllResultsForm.addEventListener('submit', onUrlChange);
   };
 }
 
