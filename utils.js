@@ -14,8 +14,8 @@ export const parseMarkdownToHTML = (text) => {
   
   // Headers (h1, h2, h3)
   html = html.replace(/^### (.*?)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.*?)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^# (.*?)$/gm, '<h1>$1</h1>');
+  html = html.replace(/^## (.*?)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^# (.*?)$/gm, '<h3>$1</h3>');
   
   // Bold text
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -130,9 +130,10 @@ export const parseMarkdownToHTML = (text) => {
   
   html = quoteProcessed.join('\n');
   
-  // Line breaks (double newline becomes paragraph, single becomes <br>)
-  html = html.replace(/\n\n/g, '</p><p>');
-  html = html.replace(/\n/g, '<br/>');
+  // Convert paragraphs: double newline = paragraph break, single = space
+  html = html.replace(/\n\n+/g, '</p><p>');
+  // Remove remaining single newlines (let CSS margins handle spacing)
+  html = html.replace(/\n/g, ' ');
   
   // Wrap in paragraph if not already wrapped
   if (!html.startsWith('<h') && !html.startsWith('<ul') && !html.startsWith('<ol') && !html.startsWith('<blockquote')) {
